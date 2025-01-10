@@ -3,6 +3,8 @@ import sys
 import numpy as np
 import matplotlib.pyplot as plt
 
+from roots_of_quadratic import roots_of_quadratic
+
 
 
 def bezier(bezier_points):
@@ -55,7 +57,7 @@ def bezier_as_quadratic_with_one_t(bezier_points):
     plt.show()
 
 
-def render_bezier(bezier_points):
+def render_bezier(bezier_points, shape=None):
 
     start, middle, end = to_start_middle_end(bezier_points)
     a, b, c = to_a_b_c_quadratic(start, middle, end)
@@ -79,9 +81,13 @@ def render_bezier(bezier_points):
                                        all_t_as_cycle
                                        )
 
-    enter_or_leave = to_row_enter_and_leaves(prior_pixel_coordinate, pixel_coordinate, next_pixel_coordinate)
 
-    filled_bitmap, outline_coordinate = bitmap_fill(pixel_coordinate, enter_or_leave)
+
+    enter_or_leave = to_row_enter_and_leaves(prior_pixel_coordinate, pixel_coordinate, next_pixel_coordinate)
+    plt.scatter(pixel_coordinate[:, 0], pixel_coordinate[:, 1], c=enter_or_leave)
+    plt.show()
+
+    filled_bitmap, outline_coordinate = bitmap_fill(pixel_coordinate, enter_or_leave, shape)
 
     anti_aliasing_coordinates, next_anti_aliasing_coordinates, anti_aliasing_normal = bitmap_outline_antialiasing_coordinates(
         pixel_intercept, next_pixel_intercept)
@@ -90,7 +96,13 @@ def render_bezier(bezier_points):
 
     bounding_area_anti_aliasing(filled_bitmap, outline_coordinate, anti_aliasing_coordinates, next_anti_aliasing_coordinates, anti_aliasing_normal)
 
+    return filled_bitmap
+
+def render_bezier_contours(bezier_points, contour_count, contour_starts):
+
     pass
+
+
 
 
 def to_start_middle_end(bezier_points):
@@ -170,7 +182,13 @@ def t_values_for_quadratic(a_bezier_component_indexed_by_intercept, b_bezier_com
     epsilon_bezier_component_indexed_by_intercept = (a_bezier_component_indexed_by_intercept == 0.0) * sys.float_info.epsilon
     b_per_a = (b_bezier_component_indexed_by_intercept / (a_bezier_component_indexed_by_intercept + epsilon_bezier_component_indexed_by_intercept))
     c_with_intercepts_per_a = (c_with_intercepts / (a_bezier_component_indexed_by_intercept + epsilon_bezier_component_indexed_by_intercept))
+    # @TODO start of use of correct quadratic
+    solutions, has_solutions = roots_of_quadratic(a_bezier_component_indexed_by_intercept, b_bezier_component_indexed_by_intercept, c_with_intercepts)
+    return solutions[:, 0], solutions[:, 1], has_solutions
 
+    t1, t2 = solutions[:, 0][has_solutions[:, 0]], solutions[:, 1][has_solutions[:, 1]]
+    return t1, t2, has_solutions
+    # end use of correct quadratic
     return solve_scaled_quadratic(b_per_a, c_with_intercepts_per_a)
 
 def solve_scaled_quadratic(b_per_a, c_per_a):
@@ -187,24 +205,45 @@ def solve_scaled_quadratic(b_per_a, c_per_a):
 
 
 def valid_intercept_t_values(t1, t2, has_intercept):
-    t1_is_valid = np.logical_and(0 <= t1, t1 <= 1)
-    t2_is_valid = np.logical_and(0 <= t2, t2 <= 1)
+    t1_with_intercept, t2_with_intercept = t1[has_intercept[:, 0]], t2[has_intercept[:, 1]]
 
-    valid_t1 = t1[t1_is_valid]
-    valid_t2 = t2[t2_is_valid]
+    t1_is_valid = np.logical_and(0 <= t1_with_intercept, t1_with_intercept <= 1)
+    t2_is_valid = np.logical_and(0 <= t2_with_intercept, t2_with_intercept <= 1)
 
-    intercept_indices_with_valid_t = np.arange(has_intercept.shape[0])[has_intercept]
-    intercept_indices_with_valid_t1 = intercept_indices_with_valid_t[t1_is_valid]
-    intercept_indices_with_valid_t2 = intercept_indices_with_valid_t[t2_is_valid]
+    # intercept_indices_with_valid_t = np.arange(a_bezier_indexed_by_intercept.shape[0])[u_squared_is_possible]
+    # intercept_indices_with_valid_t1 = intercept_indices_with_valid_t[t1_is_valid]
+    # intercept_indices_with_valid_t2 = intercept_indices_with_valid_t[t2_is_valid]
+    intercept_indices = np.arange(has_intercept.shape[0])
+    intercept_indices_with_valid_t1 = intercept_indices[has_intercept[:, 0]][t1_is_valid]
+    intercept_indices_with_valid_t2 = intercept_indices[has_intercept[:, 1]][t2_is_valid]
+
+    valid_t1 = t1_with_intercept[t1_is_valid]
+    valid_t2 = t2_with_intercept[t2_is_valid]
 
     all_t_unsorted = np.concatenate([valid_t1, valid_t2])
-
     all_intercept_indices_by_t_unsorted = np.concatenate([intercept_indices_with_valid_t1, intercept_indices_with_valid_t2])
 
+
+    # t1_is_valid = np.logical_and(0 <= t1, t1 <= 1)
+    # t2_is_valid = np.logical_and(0 <= t2, t2 <= 1)
+    #
+    # valid_t1 = t1[t1_is_valid]
+    # valid_t2 = t2[t2_is_valid]
+    #
+    # intercept_indices_with_valid_t = np.arange(has_intercept.shape[0])[has_intercept]
+    # intercept_indices_with_valid_t1 = intercept_indices_with_valid_t[t1_is_valid]
+    # intercept_indices_with_valid_t2 = intercept_indices_with_valid_t[t2_is_valid]
+    #
+    # all_t_unsorted = np.concatenate([valid_t1, valid_t2])
+    #
+    # all_intercept_indices_by_t_unsorted = np.concatenate([intercept_indices_with_valid_t1, intercept_indices_with_valid_t2])
+
     return all_t_unsorted, all_intercept_indices_by_t_unsorted
+
+
 def intercepts_as_cycle(all_t_unsorted, all_intercept_indices_by_t_unsorted, intercept_bezier_indices):
 
-    t_cycle_order = np.argsort(intercept_bezier_indices[all_intercept_indices_by_t_unsorted, 0] * 2 + all_t_unsorted)
+    t_cycle_order = np.argsort(intercept_bezier_indices[all_intercept_indices_by_t_unsorted, 0]  + all_t_unsorted)
 
     all_t_as_cycle = all_t_unsorted[t_cycle_order]
     all_intercept_indices_by_t_as_cycle = all_intercept_indices_by_t_unsorted[t_cycle_order]
@@ -226,17 +265,23 @@ def to_intercept_and_pixel_coordinates(a_bezier_indexed_by_intercept,
 
     next_pixel_intercept = np.roll(pixel_intercept, -1, axis=0)
 
-    # @TODO this should be faster and still accurate for positive screen coordinates with .astype(np.int32)
+    # @TODO this should be faster and still accurate for positive screen coordinates with .astype(np.int32) instead of floor
     pixel_coordinate = np.floor((pixel_intercept + next_pixel_intercept) / 2.0).astype(np.int32)
 
     next_pixel_coordinate = np.roll(pixel_coordinate, 1, axis=0)
     prior_pixel_coordinate = np.roll(pixel_coordinate, -1, axis=0)
 
     plt.scatter(pixel_intercept[:, 0], pixel_intercept[:, 1], c=all_intercept_indices_by_t_as_cycle/len(all_intercept_indices_by_t_as_cycle))
+    plt.show()
+
     return pixel_intercept, next_pixel_intercept, prior_pixel_coordinate, pixel_coordinate, next_pixel_coordinate
 
 
 def to_row_enter_and_leaves(prior_pixel_coordinate, pixel_coordinate, next_pixel_coordinate):
+
+    # enter_or_leave = 1 * ((next_pixel_coordinate[:, 1] - pixel_coordinate[:, 1]) > 0) - ((pixel_coordinate[:, 1] - prior_pixel_coordinate[:, 1]) < 0)
+    #
+    # return enter_or_leave
     # multiply by 90 degree rotation matrix
     normal = ((next_pixel_coordinate - prior_pixel_coordinate)[:, np.newaxis, :] @ np.array([[0, -1],[1, 0]])[np.newaxis, :, :])[:, 0, :] + \
                np.logical_and(np.all(next_pixel_coordinate == prior_pixel_coordinate, axis=1), ~np.all(next_pixel_coordinate == pixel_coordinate, axis=1))[:, np.newaxis] * (next_pixel_coordinate - pixel_coordinate)
@@ -249,16 +294,27 @@ def to_row_enter_and_leaves(prior_pixel_coordinate, pixel_coordinate, next_pixel
 
     return enter_or_leave
 
-def bitmap_fill(pixel_coordinate, enter_or_leave):
-    offset = np.min(pixel_coordinate, axis=0, initial=sys.maxsize) - 1
-    size = np.max(pixel_coordinate, axis=0, initial=-(sys.maxsize - 1)) - offset + 2
+def bitmap_fill(pixel_coordinate, enter_or_leave, size):
+    # offset = np.min(pixel_coordinate, axis=0, initial=2147483647)
+    # size = np.max(pixel_coordinate, axis=0, initial=-(2147483647 - 1)) - offset + 2
 
-    outline_coordinate = pixel_coordinate - offset
+    outline_coordinate = pixel_coordinate # - offset[np.newaxis, :]  # * np.abs(enter_or_leave)[:, np.newaxis]
     enter_or_leave_outline = enter_or_leave
     outline_bitmap = np.zeros(size)
-    outline_bitmap[outline_coordinate[:, 0], outline_coordinate[:, 1]] += enter_or_leave_outline
+    # outline_bitmap[outline_coordinate[:, 0], outline_coordinate[:, 1]] += enter_or_leave_outline
+
+    #@TODO: vectorize this
+    # for i in range(outline_coordinate.shape[0]):
+    #     outline_bitmap[outline_coordinate[i, 0], outline_coordinate[i, 1]] += enter_or_leave_outline[i]
+
+    outline_bitmap[outline_coordinate[:, 0], outline_coordinate[:, 1]] += enter_or_leave_outline[:]
+
+    plt.imshow(outline_bitmap)
+    plt.show()
 
     bitmap = np.cumsum(outline_bitmap, axis=0)
+    plt.imshow(bitmap)
+    plt.show()
     bitmap[outline_coordinate[:, 0], outline_coordinate[:, 1]] = 1
 
     return bitmap, outline_coordinate
@@ -270,10 +326,11 @@ def bitmap_outline_antialiasing_coordinates(pixel_intercept, next_pixel_intercep
     anti_aliasing_coordinates = np.clip(pixel_intercept - anti_aliasing_pixel_coordinate, 0, 1)
     next_anti_aliasing_coordinates = np.clip(anti_aliasing_coordinates + to_next_anti_aliasing_coordinate, 0, 1)
 
-    anti_aliasing_normal = (to_next_anti_aliasing_coordinate[:, np.newaxis, :] @ np.array([[0, -1],[1, 0]])[np.newaxis, :, :])[:, 0, :] * \
-                           np.all(anti_aliasing_coordinates != next_anti_aliasing_coordinates, axis=1, keepdims=True) # hack to fix edge case that seems to mess up random sampling, but work fine with bounding area based calculations
-    # anti_aliasing_normal /= np.linalg.norm(anti_aliasing_normal, axis=1)[:, np.newaxis]
-
+    # anti_aliasing_normal = (to_next_anti_aliasing_coordinate[:, np.newaxis, :] @ np.array([[0, -1],[1, 0]])[np.newaxis, :, :])[:, 0, :] * \
+    #                        np.all(anti_aliasing_coordinates != next_anti_aliasing_coordinates, axis=1, keepdims=True) # hack to fix edge case that seems to mess up random sampling, but work fine with bounding area based calculations
+    ## anti_aliasing_normal /= np.linalg.norm(anti_aliasing_normal, axis=1)[:, np.newaxis]
+    anti_aliasing_normal = (to_next_anti_aliasing_coordinate[:, np.newaxis, :] @ np.array([[0, -1], [1, 0]])[np.newaxis,
+                                                                                :, :])[:, 0, :]
     return anti_aliasing_coordinates, next_anti_aliasing_coordinates, anti_aliasing_normal
 
 
@@ -293,7 +350,7 @@ def random_sample_anti_aliasing(bitmap, outline_coordinate, anti_aliasing_coordi
     # plt.show()
 
     bitmap[outline_coordinate[:, 0], outline_coordinate[:, 1]] = ink_area
-    plt.imshow(np.flip(bitmap.T))
+    plt.imshow(np.flip(bitmap.T), interpolation="none")
     plt.show()
 
 def bounding_area_anti_aliasing(bitmap, outline_coordinate, anti_aliasing_coordinates, next_anti_aliasing_coordinates, anti_aliasing_normal):
@@ -317,9 +374,27 @@ def bounding_area_anti_aliasing(bitmap, outline_coordinate, anti_aliasing_coordi
 
     bitmap[outline_coordinate[:, 0], outline_coordinate[:, 1]] = ink_area
 
-    plt.imshow(np.flip(bitmap.T))
+    plt.imshow(np.flip(bitmap.T), interpolation="none")
     plt.show()
 
+
+def old_quadratic_approach(a_bezier_component_indexed_by_intercept, b_bezier_component_indexed_by_intercept, c_with_intercepts):
+    epsilon_a_bezier_component_indexed_by_intercept = (a_bezier_component_indexed_by_intercept == 0.0) * sys.float_info.epsilon
+    b_per_a = (b_bezier_component_indexed_by_intercept / (a_bezier_component_indexed_by_intercept + epsilon_a_bezier_component_indexed_by_intercept))
+    c_with_intercepts_per_a = (c_with_intercepts / (a_bezier_component_indexed_by_intercept + epsilon_a_bezier_component_indexed_by_intercept))
+
+
+    m_with_impossibles = -b_per_a / 2
+    u_squared_with_impossibles = m_with_impossibles * m_with_impossibles - c_with_intercepts_per_a
+    u_squared_is_possible = u_squared_with_impossibles > 0
+    m = m_with_impossibles[u_squared_is_possible]
+    u_squared = u_squared_with_impossibles[u_squared_is_possible]
+    u = np.sqrt(u_squared)
+
+    t1 = m - u
+    t2 = m + u
+
+    return t1, t2, u_squared_is_possible
 
 
 
@@ -361,28 +436,23 @@ def bezier_pixel_intercepts(bezier_points):
     # 2 * a * t + b = 0
     # t_max_or_min = -b / (2 * a)
 
-    epsilon_a_bezier_component_indexed_by_intercept = (a_bezier_component_indexed_by_intercept == 0.0) * sys.float_info.epsilon
-    b_per_a = (b_bezier_component_indexed_by_intercept / (a_bezier_component_indexed_by_intercept + epsilon_a_bezier_component_indexed_by_intercept))
-    c_with_intercepts_per_a = (c_with_intercepts / (a_bezier_component_indexed_by_intercept + epsilon_a_bezier_component_indexed_by_intercept))
+    old_t1, old_t2, old_u_squared_is_possible = old_quadratic_approach(a_bezier_component_indexed_by_intercept, b_bezier_component_indexed_by_intercept, c_with_intercepts)
 
+    solutions, has_solutions = roots_of_quadratic(a_bezier_component_indexed_by_intercept, b_bezier_component_indexed_by_intercept, c_with_intercepts)
 
-    m_with_impossibles = -b_per_a / 2
-    u_squared_with_impossibles = m_with_impossibles * m_with_impossibles - c_with_intercepts_per_a
-    u_squared_is_possible = u_squared_with_impossibles > 0
-    m = m_with_impossibles[u_squared_is_possible]
-    u_squared = u_squared_with_impossibles[u_squared_is_possible]
-    u = np.sqrt(u_squared)
+    t1, t2 = solutions[:, 0][has_solutions[:, 0]], solutions[:, 1][has_solutions[:, 1]]
 
-    t1 = m - u
-    t2 = m + u
-
+    u_squared_is_possible = np.all(has_solutions, axis=1)
 
     t1_is_valid = np.logical_and(0 <= t1, t1 <= 1)
     t2_is_valid = np.logical_and(0 <= t2, t2 <= 1)
 
-    intercept_indices_with_valid_t = np.arange(a_bezier_indexed_by_intercept.shape[0])[u_squared_is_possible]
-    intercept_indices_with_valid_t1 = intercept_indices_with_valid_t[t1_is_valid]
-    intercept_indices_with_valid_t2 = intercept_indices_with_valid_t[t2_is_valid]
+    # intercept_indices_with_valid_t = np.arange(a_bezier_indexed_by_intercept.shape[0])[u_squared_is_possible]
+    # intercept_indices_with_valid_t1 = intercept_indices_with_valid_t[t1_is_valid]
+    # intercept_indices_with_valid_t2 = intercept_indices_with_valid_t[t2_is_valid]
+    intercept_indices = np.arange(a_bezier_indexed_by_intercept.shape[0])
+    intercept_indices_with_valid_t1 = intercept_indices[has_solutions[:, 0]][t1_is_valid]
+    intercept_indices_with_valid_t2 = intercept_indices[has_solutions[:, 1]][t2_is_valid]
 
     valid_t1 = t1[t1_is_valid]
     valid_t2 = t2[t2_is_valid]
@@ -508,8 +578,11 @@ def bezier_pixel_intercepts(bezier_points):
 
     bitmap[outline_coordinate[:, 0], outline_coordinate[:, 1]] = ink_area
 
+    plt.title('bezier pixel intercept bitmap')
     plt.imshow(np.flip(bitmap.T))
     plt.show()
+
+    return bitmap
 
     pass
     # integrate(fx(t) fy'(t))
@@ -593,9 +666,11 @@ def main():
     bezier_points[:, 0] = np.cos(alpha) * radius * 2
     bezier_points[:, 1] = np.sin(alpha) * radius * 2
 
-    bezier_pixel_intercepts(bezier_points)
+    # bezier_pixel_intercepts(bezier_points)
 
-    render_bezier(bezier_points)
+    positive_bezier_points = bezier_points - bezier_points.min(axis=0, keepdims=True) + 1
+
+    render_bezier(positive_bezier_points, np.ceil(positive_bezier_points.max(axis=0)).astype(np.uint32))
     pass
 
 

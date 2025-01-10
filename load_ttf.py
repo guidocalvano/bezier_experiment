@@ -234,24 +234,35 @@ def main():
     plt.scatter(x_coordinate_with_looped_contours[endpoint_of_looped_target_contours[2]], y_coordinate_with_looped_contours[endpoint_of_looped_target_contours[2]], c="green")
 
     ax = plt.gca()
-    plt.title('third looped contour')
+    plt.title('third looped contour ASDFASDFASDF')
     ax.set_aspect('equal', adjustable='box')
     plt.show()
 
 
 
+    # image_list = []
+    # for i in range(3):
+    #     image = bezier_pixel_intercepts(np.array([x_coordinate_with_looped_contours[startpoint_of_looped_target_contours[i]:endpoint_of_looped_target_contours[i] + 1],
+    #                                   y_coordinate_with_looped_contours[startpoint_of_looped_target_contours[i]:endpoint_of_looped_target_contours[i] + 1]]).T / 30)
+    #
+    #     image_list.append(image)
+
+    image_list = []
 
     for i in range(3):
-        bezier_pixel_intercepts(np.array([x_coordinate_with_looped_contours[startpoint_of_looped_target_contours[i]:endpoint_of_looped_target_contours[i] + 1],
-                                      y_coordinate_with_looped_contours[startpoint_of_looped_target_contours[i]:endpoint_of_looped_target_contours[i] + 1]]).T / 30)
-
-    for i in range(3):
-        render_bezier(np.array([x_coordinate_with_looped_contours[
+        image = render_bezier(np.array([x_coordinate_with_looped_contours[
                                           startpoint_of_looped_target_contours[i]:endpoint_of_looped_target_contours[
                                                                                       i] + 1],
                                           y_coordinate_with_looped_contours[
                                           startpoint_of_looped_target_contours[i]:endpoint_of_looped_target_contours[
-                                                                                      i] + 1]]).T / 30)
+                                                                                      i] + 1]]).T / 30, [25,25])
+
+        image_list.append(image)
+
+    composite_image = -np.sum(image_list, axis=0)
+    plt.title('composite image')
+    plt.imshow(composite_image)
+    plt.show()
 
     # messed up serial format
 
